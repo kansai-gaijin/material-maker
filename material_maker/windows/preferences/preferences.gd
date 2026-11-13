@@ -70,5 +70,8 @@ func _on_DownloadLanguage_closed():
 	update_language_list()
 
 func _on_ready() -> void:
+	if not OS.get_name() in [ "HTML5", "Web" ]:
+		preload("res://material_maker/windows/preferences/mcp_preferences.gd").add_page(%TabContainer)
+		$HSplitContainer/PreferenceCategory/Tree.update_tree()
 	%WinTabletDriver.visible = OS.get_name() == "Windows"
 	%WinTabletDriverSpacer.visible = OS.get_name() == "Windows"

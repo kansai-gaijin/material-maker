@@ -71,6 +71,9 @@ const DEFAULT_CONFIG : Dictionary = {
 	ui_3d_preview_generated_mesh = true,
 	nearest_filter_reference = false,
 	sub_node_items = [],
+	mcp_server_enabled = true,
+	mcp_server_port = 8790,
+	mcp_server_token = "",
 }
 
 

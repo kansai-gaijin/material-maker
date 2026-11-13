@@ -1175,6 +1175,9 @@ func _on_GraphEdit_node_selected(node : GraphElement) -> void:
 	else:
 		highlight_connections()
 		await get_tree().process_frame
+		# The node may have been removed meanwhile (e.g. undo/redo issued by an MCP client)
+		if not is_instance_valid(node) or not node.is_inside_tree():
+			return
 		if current_preview[0] != null:
 			for n in get_selected_nodes():
 				if n.generator == current_preview[0].generator:

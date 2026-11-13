@@ -8,6 +8,12 @@ described as interconnected nodes.
 
 ![Screenshot](material_maker/doc/images/screenshot.png)
 
+> **This fork** adds a built-in [MCP](https://modelcontextprotocol.io) server:
+> while Material Maker is open, coding agents (Claude Code, Codex, ...) can
+> build, edit, render, save and export materials at
+> `http://127.0.0.1:8790/mcp`. See
+> [material_maker/tools/mcp_server/README.md](material_maker/tools/mcp_server/README.md).
+
 ## Download
 
 - **[itch.io](https://rodzilla.itch.io/material-maker)**

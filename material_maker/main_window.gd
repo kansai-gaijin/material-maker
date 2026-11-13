@@ -348,6 +348,50 @@ func on_config_changed() -> void:
 	if mm_globals.config.get_value("window", "theme") == "custom":
 		change_theme("custom")
 
+	update_mcp_server()
+
+# MCP server
+
+# Untyped and loaded on demand on purpose: referencing MMMcpServer as a static
+# type from this script made Godot 4.7 crash while compiling the main window.
+var mcp_server = null
+const MCP_SERVER_SCRIPT : String = "res://material_maker/tools/mcp_server/mcp_server.gd"
+const MCP_DEFAULT_PORT : int = 8790
+
+## Starts, restarts or stops the built-in MCP server according to the
+## preferences. `--mcp-port=<port>` on the command line overrides the port
+## (and enables the server), `--no-mcp` disables it.
+func update_mcp_server() -> void:
+	var enabled : bool = mm_globals.get_config("mcp_server_enabled")
+	var port : int = int(mm_globals.get_config("mcp_server_port"))
+	var token : String = str(mm_globals.get_config("mcp_server_token")).strip_edges()
+	for a in OS.get_cmdline_args() + OS.get_cmdline_user_args():
+		if a == "--no-mcp":
+			enabled = false
+		elif a.begins_with("--mcp-port="):
+			port = a.get_slice("=", 1).to_int()
+			enabled = true
+	if OS.get_name() in [ "HTML5", "Web" ]:
+		enabled = false
+	if port < 1 or port > 65535:
+		port = MCP_DEFAULT_PORT
+	if not enabled:
+		if mcp_server != null:
+			mcp_server.stop()
+			mcp_server.queue_free()
+			mcp_server = null
+			mm_logger.message("MCP server stopped")
+		return
+	if mcp_server != null and mcp_server.is_running() and mcp_server.port == port and mcp_server.token == token:
+		return
+	if mcp_server == null:
+		mcp_server = load(MCP_SERVER_SCRIPT).new()
+		mcp_server.name = "McpServer"
+		add_child(mcp_server)
+	else:
+		mcp_server.stop()
+	mcp_server.start(port, token)
+
 func get_panel(panel_name : String) -> Control:
 	return layout.get_panel(panel_name)
 
