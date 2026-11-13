@@ -176,7 +176,11 @@ If something went wrong, `undo` reverts your last call exactly.
 You cannot judge a material from its graph. After each meaningful change:
 
 - `render_output {node, output, size: 256-512}` shows one node's image. Check
-  intermediate nodes (the height!) before blaming the end result.
+  intermediate nodes (the height!) before blaming the end result. To see fine
+  detail, render big and zoom: `size: 2048, region: {x: 0.45, y: 0.45,
+  width: 0.08, height: 0.08}` returns that small area at full resolution,
+  enlarged. A whole-texture render shrunk to 1024 px hides exactly the detail
+  (strands, pores, stitching) that makes a material convincing.
 - `render_material_preview {shape: "sphere" | "cube" | "cylinder" | "current"}`
   shows the lit material. It waits for rendering to finish; a `warning` field
   means some buffers were still rendering, so render again before judging.
@@ -197,7 +201,50 @@ Diagnosing:
 - **Muddy color**: gradient too dark or too narrow; albedo should not contain
   shading, AO does that.
 
-## 6. Save and export
+## 6. Working from a reference image
+
+When the person gives you a photo, the photo is the specification, and its
+fine detail is what separates a convincing material from a generic one. A
+glance at the whole photo gives you colours and layout; it does not tell you
+how a weave is built. So study it before you build, and compare against it
+up close before you finish.
+
+1. **Look at the whole image** with `inspect_image {path}` for layout,
+   proportions, colours and how the light falls.
+2. **Zoom into the fine detail** with `inspect_image {path, region}`. Take
+   several small regions (5–15 % of the image) where the detail is sharpest
+   and best lit, typically near the camera: a patch of the main surface, a
+   border or edge, a seam, any ornament. Zoom further if the structure is
+   still unclear. Write down what you actually see:
+   - the repeating element (a strand, fibre, grain, tile, stitch) and its
+     cross-section: rounded, flat, ridged? Where is it light and dark?
+   - how elements are arranged and bound: row length, offsets, binding
+     threads or stitches, and their rhythm;
+   - variation between elements: colour shifts strand to strand, thickness
+     irregularity, gaps, fibres sticking out;
+   - real-world scale: count elements across a feature of known size (a
+     tatami mat is about 88 × 176 cm, a brick 21 × 6.5 cm, a floor plank
+     10–20 cm wide) to choose repeat counts per texture.
+3. **Build the element, not just a stripe.** A row of `0.5 + 0.5·sin` lines
+   reads as ruled paper, not woven rush. Model one element's profile (a
+   rounded shape or gradient pushed through `tones_map`/`colorize`), repeat
+   it with a pattern that gives per-element data (e.g. `bricks3` output 1
+   "Brick Fill" → `fill_to_random_grey2` for a random value per element, or
+   → `fill_to_uv2` to shape each element individually; more in
+   `references/nodes.md` §5.7), and drive colour, height and roughness
+   variation from those values.
+4. **Compare at matched zoom.** Render the albedo (and height) with
+   `render_output {size: 2048, region}` over an area showing the same number
+   of elements as your reference crop, then look at the two side by side.
+   List the differences explicitly (profile, spacing, contrast, colour
+   variance, binding detail, border motif) and fix the biggest one. Repeat
+   until the close-ups match, then check the whole texture again for
+   scale and repetition.
+5. **Only claim what you have seen.** Before you describe the result, check
+   every feature you mention in a render (a seam, a stitch, an offset). If it
+   is not visible, either fix it or don't claim it.
+
+## 7. Save and export
 
 - `save_project {project, path: "C:/.../name.ptex"}` (absolute path; later
   saves without `path` reuse it). Do not leave the person with an unsaved tab

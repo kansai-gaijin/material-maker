@@ -176,6 +176,12 @@ def main():
     png = image_of(result)
     check("render returns a PNG", png is not None and png[:8] == b"\x89PNG\r\n\x1a\n")
     check("render saved to disk", os.path.exists(out + "/tint.png"))
+    data, result = tool(c, "render_output", {"project": project, "node": tint, "size": 1024,
+                                             "region": {"x": 0.25, "y": 0.25, "width": 0.1, "height": 0.1}})
+    check("render_output zooms into a full-resolution region", data.get("region_pixels", {}).get("width") == 102 and image_of(result) is not None, data)
+    data, result = tool(c, "inspect_image", {"path": out + "/tint.png", "region": {"x": 0, "y": 0, "width": 0.5, "height": 0.5}, "max_size": 256})
+    check("inspect_image reads and zooms a file", data.get("width") == 256 and data.get("zoom") == 2.0 and image_of(result) is not None, data)
+    tool(c, "inspect_image", {"path": out + "/no_such_file.png"}, expect_error=True)
     data, result = tool(c, "render_material_preview", {"project": project, "shape": "sphere", "size": 256})
     check("material preview image", image_of(result) is not None)
     data, result = tool(c, "capture_view", {"area": "window"})

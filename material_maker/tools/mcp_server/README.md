@@ -54,7 +54,8 @@ references written from the manual (`references/concepts.md`,
 | `describe_node_type` | Parameters (type, range, enum values, defaults) and ports of a type or library item |
 | `get_graph` | Nodes, parameter values, ports and connections of a graph or group |
 | `get_node` | Full detail of one node, including parameter definitions and current values |
-| `render_output` | Render a node output to PNG (returned as an image, optionally saved as png/exr/jpg/webp) |
+| `render_output` | Render a node output to PNG, or zoom into a full-resolution `region` (optionally saved as png/exr/jpg/webp) |
+| `inspect_image` | Look at an image file (e.g. a reference photo), whole or zoomed into a region |
 | `render_material_preview` | Render the material on a sphere, cube, cylinder or the current 3D preview object |
 | `capture_view` | Screenshot the window, graph editor, 2D or 3D preview panel |
 | `get_console` | Latest console lines (shader errors, export messages) |

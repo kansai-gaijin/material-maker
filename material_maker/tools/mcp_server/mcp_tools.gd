@@ -37,6 +37,9 @@ static func _schema(properties : Dictionary, required : Array = []) -> Dictionar
 
 const P_PROJECT : Dictionary = { type = "integer", minimum = 0, description = "Project tab index from get_status. Defaults to the project shown in the editor." }
 const P_GRAPH : Dictionary = { type = "string", description = "Group (subgraph) path such as \"my_group\" or \"outer/inner\"; \"\" is the top-level graph. Defaults to the graph currently shown in the editor. Editing tools switch the editor to this graph." }
+const P_REGION : Dictionary = { type = "object", additionalProperties = false, description = "Zoom: the part of the image to return, as fractions of its width and height (0..1). {x: 0.4, y: 0.4, width: 0.1, height: 0.1} is a 10x zoom on the centre. Omit for the whole image.",
+	properties = { x = { type = "number", minimum = 0, maximum = 1 }, y = { type = "number", minimum = 0, maximum = 1 }, width = { type = "number", exclusiveMinimum = 0, maximum = 1 }, height = { type = "number", exclusiveMinimum = 0, maximum = 1 } },
+	required = [ "x", "y", "width", "height" ] }
 const P_POSITION : Dictionary = { type = "object", properties = { x = { type = "number" }, y = { type = "number" } }, required = [ "x", "y" ], description = "Graph-space position of the node's top-left corner." }
 
 func get_tool_definitions() -> Array:
@@ -59,16 +62,21 @@ func get_tool_definitions() -> Array:
 			_schema({ project = P_PROJECT, graph = P_GRAPH, include_parameters = { type = "boolean", default = true } }), ro),
 		_def("get_node", "Get node", "Full details of one node in a graph: parameter definitions with current values, ports, connections and description.",
 			_schema({ project = P_PROJECT, graph = P_GRAPH, node = { type = "string" } }, [ "node" ]), ro),
-		_def("render_output", "Render node output", "Render one output of a node to an image and return it (PNG). Optionally save the full-resolution render to a file (.png, .exr, .jpg or .webp).",
+		_def("render_output", "Render node output", "Render one output of a node to an image and return it (PNG). Use `region` to zoom into fine detail: the render is cropped at full resolution before it is returned, so render at a high `size` (2048-4096) and look at a small region to see individual strands, pores or scratches. Optionally save the full-resolution render to a file (.png, .exr, .jpg or .webp).",
 			_schema({ project = P_PROJECT, graph = P_GRAPH, node = { type = "string" }, output = { type = "integer", minimum = 0, default = 0 },
 				size = { type = "integer", minimum = 16, maximum = MAX_RENDER_SIZE, default = 512, description = "Render resolution in pixels (square)." },
-				save_path = { type = "string", description = "Absolute file path to also write the full-resolution image to." },
-				return_image = { type = "boolean", default = true, description = "Return the image in the result (downscaled to at most 1024 px)." } }, [ "node" ]),
+				region = P_REGION,
+				save_path = { type = "string", description = "Absolute file path to also write the full, uncropped render to." },
+				return_image = { type = "boolean", default = true, description = "Return the image (or region) in the result, fitted to at most 1024 px." } }, [ "node" ]),
 			{ readOnlyHint = false, destructiveHint = false, idempotentHint = true, openWorldHint = false }),
 		_def("render_material_preview", "Render material preview", "Render the project's material on a 3D object (sphere, cube, cylinder, or the object and camera currently set in the 3D preview panel) and return the image.",
 			_schema({ project = P_PROJECT, shape = { "type": "string", "enum": [ "sphere", "cube", "cylinder", "current" ], "default": "sphere" }, size = { type = "integer", minimum = 64, maximum = 2048, default = 512 } }), ro),
 		_def("capture_view", "Capture view", "Screenshot part of the Material Maker window as the person sees it: the whole window, the graph editor, the 2D preview or the 3D preview panel.",
 			_schema({ area = { "type": "string", "enum": [ "window", "graph", "preview_2d", "preview_3d" ], "default": "window" } }), ro),
+		_def("inspect_image", "Inspect image", "Look at an image file on disk (a reference photo, an exported texture...), whole or zoomed into a region at full resolution. Small regions are enlarged so fine detail (weave, grain, stitching, pores) is clearly visible. Returns the image and the file's pixel size.",
+			_schema({ path = { type = "string", description = "Absolute path of a png, jpg, webp, exr, hdr, tga or bmp file." },
+				region = P_REGION,
+				max_size = { type = "integer", minimum = 128, maximum = 1600, default = 1024, description = "Longest side of the returned image; crops are scaled up or down to it." } }, [ "path" ]), ro),
 		_def("get_console", "Get console", "Read the latest lines of Material Maker's console (shader errors, export messages, MCP activity).",
 			_schema({ lines = { type = "integer", minimum = 1, maximum = 500, default = 50 } }), ro),
 		_def("list_export_targets", "List export targets", "List the export profiles available for the project's material (e.g. \"Godot/Godot 4 Standard\", \"Unity/3D\", \"Unreal/Unreal 5\", \"Blender\").",
@@ -719,8 +727,59 @@ func _tool_render_output(args : Dictionary) -> Dictionary:
 		info.saved_to = str(args.save_path)
 	var images : Array = []
 	if args.get("return_image", true):
-		images.append(_image_content(_downscaled(image, MAX_RETURNED_IMAGE_SIZE)))
+		var view : Dictionary = _region_view(image, args.get("region"), MAX_RETURNED_IMAGE_SIZE)
+		if view.has("error"):
+			return _fail(view.error)
+		if view.has("region_pixels"):
+			info.region_pixels = view.region_pixels
+		images.append(_image_content(view.image))
 	return _ok(info, images)
+
+## Crops `image` to a fractional region (if any) at full resolution, then
+## fits the result to `max_size`: big images shrink, small crops are enlarged
+## so their detail is easy to see. Returns { image, region_pixels? } or { error }.
+static func _region_view(image : Image, region, max_size : int) -> Dictionary:
+	var result : Dictionary = {}
+	var view : Image = _to_8bit(image)
+	if region is Dictionary:
+		var w : int = image.get_width()
+		var h : int = image.get_height()
+		var rect : Rect2i = Rect2i(int(float(region.get("x", 0.0)) * w), int(float(region.get("y", 0.0)) * h),
+			max(1, int(float(region.get("width", 1.0)) * w)), max(1, int(float(region.get("height", 1.0)) * h)))
+		rect = rect.intersection(Rect2i(0, 0, w, h))
+		if rect.size.x < 2 or rect.size.y < 2:
+			return { error = "The region is outside the image or smaller than 2 pixels." }
+		view = view.get_region(rect)
+		result.region_pixels = { x = rect.position.x, y = rect.position.y, width = rect.size.x, height = rect.size.y }
+	var longest : int = max(view.get_width(), view.get_height())
+	if longest != max_size and (longest > max_size or region is Dictionary):
+		var scale : float = float(max_size) / longest
+		view = view.duplicate()
+		# Nearest keeps individual pixels crisp when zooming far in
+		var interpolation : int = Image.INTERPOLATE_NEAREST if scale >= 4.0 else Image.INTERPOLATE_LANCZOS
+		view.resize(max(1, int(view.get_width() * scale)), max(1, int(view.get_height() * scale)), interpolation)
+	result.image = view
+	return result
+
+func _tool_inspect_image(args : Dictionary) -> Dictionary:
+	var path : String = str(args.path).replace("\\", "/")
+	if not path.is_absolute_path():
+		return _fail("`path` must be absolute.")
+	if not FileAccess.file_exists(path):
+		return _fail("No file at `%s`." % path)
+	var image : Image = Image.load_from_file(path)
+	if image == null or image.is_empty():
+		return _fail("`%s` is not an image Material Maker can read (png, jpg, webp, exr, hdr, tga, bmp)." % path)
+	if image.is_compressed():
+		image.decompress()
+	var view : Dictionary = _region_view(image, args.get("region"), clampi(int(args.get("max_size", 1024)), 128, 1600))
+	if view.has("error"):
+		return _fail(view.error)
+	var info : Dictionary = { path = path, width = image.get_width(), height = image.get_height() }
+	if view.has("region_pixels"):
+		info.region_pixels = view.region_pixels
+		info.zoom = snappedf(float(view.image.get_width()) / view.region_pixels.width, 0.01)
+	return _ok(info, [ _image_content(view.image) ])
 
 func _save_image(image : Image, path : String) -> Error:
 	if not path.is_absolute_path():
