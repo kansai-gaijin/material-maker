@@ -49,6 +49,13 @@ jobs:
           for folder in addons/material_maker/nodes material_maker/environments material_maker/examples material_maker/library material_maker/meshes material_maker/misc/export; do
             cp -R "./$folder" build/material_maker
           done
+      - name: Add the agent skill and MCP docs
+        run: |
+          mkdir -p build/material_maker/skill
+          cp -R material_maker/tools/mcp_server/skill/material-maker build/material_maker/skill/
+          cp material_maker/tools/mcp_server/README.md build/material_maker/MCP_SERVER.md
+          cp material_maker/tools/mcp_server/smoke_test.py build/material_maker/skill/
+          (cd material_maker/tools/mcp_server/skill && zip -q -r "$GITHUB_WORKSPACE/material-maker-skill.zip" material-maker)
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -56,4 +63,18 @@ jobs:
           tag="v1.8-mcp.${GITHUB_RUN_NUMBER}"
           zip_file="Material-Maker-${tag}-windows-x64.zip"
           (cd build && zip -q -r "../${zip_file}" material_maker)
-          gh release create "$tag" "$zip_file" --target "$GITHUB_SHA" --title "Material Maker $tag" --notes "Windows build of ${GITHUB_SHA}."
+          cat > notes.md <<EOF
+          Windows build of ${GITHUB_SHA} with Material Maker's built-in MCP server.
+
+          **MCP server:** starts with the app at \`http://127.0.0.1:8790/mcp\` (Edit > Preferences > MCP to change the port, set a token or turn it off).
+
+          \`\`\`
+          claude mcp add --transport http material-maker http://127.0.0.1:8790/mcp
+          \`\`\`
+
+          **Agent skill:** \`material-maker-skill.zip\` (also in the app folder under \`skill/\`) teaches an agent how to build materials with the server. For Claude Code, unzip it into \`~/.claude/skills/\`.
+
+          See \`MCP_SERVER.md\` in the app folder for the tool list.
+          EOF
+          sed -i 's/^          //' notes.md
+          gh release create "$tag" "$zip_file" material-maker-skill.zip --target "$GITHUB_SHA" --title "Material Maker $tag" --notes-file notes.md
