@@ -299,6 +299,12 @@ up close before you finish.
   directional feature runs along (wood grain, rush ridges, a tape's length).
   For strip materials (borders, trims, tapes) say which axis spans the strip's
   width once and which tiles along its length.
+- **Relief needs geometry at grazing angles.** A normal map shades bumps but
+  cannot change a silhouette: a woven floor, cobbles or planks seen from low
+  down look flat as paper however good the textures are. When a material has
+  real relief (ridges, cobbles, tiles), tell the person to displace a
+  subdivided mesh with the exported height map (white = high), and give the
+  real depth of the relief in millimetres (e.g. "ridges 1.5 mm deep").
 - The exported engine material file (e.g. Godot `.tres`) comes from the
   export profile's template, and its parallax/height scale can be far too
   strong for a flat material. Mention it if your material has a depth
