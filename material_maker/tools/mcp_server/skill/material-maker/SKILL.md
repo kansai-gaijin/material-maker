@@ -181,9 +181,12 @@ You cannot judge a material from its graph. After each meaningful change:
   width: 0.08, height: 0.08}` returns that small area at full resolution,
   enlarged. A whole-texture render shrunk to 1024 px hides exactly the detail
   (strands, pores, stitching) that makes a material convincing.
-- `render_material_preview {shape: "sphere" | "cube" | "cylinder" | "current"}`
+- `render_material_preview {project, shape: "sphere" | "cube" | "cylinder"}`
   shows the lit material. It waits for rendering to finish; a `warning` field
   means some buffers were still rendering, so render again before judging.
+  Several agents (or the person) may share the app and switch tabs at any
+  time, so always pass your `project` index; never rely on "the current tab"
+  or on the editor's own 3D panel.
 - `capture_view {area: "graph"}` shows the graph as the person sees it.
 - `set_preview {node}` puts a node in the person's 2D preview panel.
 
@@ -200,6 +203,26 @@ Diagnosing:
 - **Plastic-looking**: roughness uniform; feed it from height or masks.
 - **Muddy color**: gradient too dark or too narrow; albedo should not contain
   shading, AO does that.
+- **Basketwork / grid look at a distance**: the same crevice is darkened
+  three times, in albedo, normal *and* AO, so every segment edge becomes a
+  hard line and the lines line up into a coarse grid when the material is seen
+  from a few metres. Keep albedo darkening in grooves subtle, let the normal
+  and AO carry the shading, and break up regular segment boundaries.
+
+**Judge it the way it will be used.** A close-up of one tile hides problems
+that appear in a real scene: fine detail adding up to a coarse pattern,
+contrast that flickers at a grazing angle, a colour that shifts under real
+light. Before finishing, render the albedo over an area of several tiles at a
+small size (`render_output {size: 256}` of a node that repeats the material
+3×3, or a `cube` preview) and look for repetition and patterns. If the person
+has a 3D scene, the best test is the material on real geometry at real scale,
+seen from the same camera as their reference.
+
+**Colours from a photo are lit colours.** A photo shows albedo × lighting ×
+camera exposure. Sample colours from evenly lit mid-tones, not highlights or
+shadows, and remember that a dark fabric (like a tatami border) has a low
+albedo even where the photo shows it lit. Agents in testing consistently made
+dark materials too light and pale materials too cool/white; correct for that.
 
 ## 6. Working from a reference image
 
@@ -270,6 +293,16 @@ up close before you finish.
   the profile would normally ask about.
 - `close_project` refuses unsaved work unless `discard_changes: true`; only
   discard tabs you created.
+- **Tell the person how to map it.** A texture is only usable if its scale
+  and direction are known. In your final message state the real-world size one
+  tile covers (per axis if not square) and which texture axis (U or V) any
+  directional feature runs along (wood grain, rush ridges, a tape's length).
+  For strip materials (borders, trims, tapes) say which axis spans the strip's
+  width once and which tiles along its length.
+- The exported engine material file (e.g. Godot `.tres`) comes from the
+  export profile's template, and its parallax/height scale can be far too
+  strong for a flat material. Mention it if your material has a depth
+  channel.
 
 ## Etiquette
 

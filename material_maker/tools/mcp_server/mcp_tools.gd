@@ -69,8 +69,8 @@ func get_tool_definitions() -> Array:
 				save_path = { type = "string", description = "Absolute file path to also write the full, uncropped render to." },
 				return_image = { type = "boolean", default = true, description = "Return the image (or region) in the result, fitted to at most 1024 px." } }, [ "node" ]),
 			{ readOnlyHint = false, destructiveHint = false, idempotentHint = true, openWorldHint = false }),
-		_def("render_material_preview", "Render material preview", "Render the project's material on a 3D object (sphere, cube, cylinder, or the object and camera currently set in the 3D preview panel) and return the image.",
-			_schema({ project = P_PROJECT, shape = { "type": "string", "enum": [ "sphere", "cube", "cylinder", "current" ], "default": "sphere" }, size = { type = "integer", minimum = 64, maximum = 2048, default = 512 } }), ro),
+		_def("render_material_preview", "Render material preview", "Render the project's material on a 3D object (sphere, cube or cylinder), independently of which tab is shown in the editor, and return the image.",
+			_schema({ project = P_PROJECT, shape = { "type": "string", "enum": [ "sphere", "cube", "cylinder" ], "default": "sphere" }, size = { type = "integer", minimum = 64, maximum = 2048, default = 512 } }), ro),
 		_def("capture_view", "Capture view", "Screenshot part of the Material Maker window as the person sees it: the whole window, the graph editor, the 2D preview or the 3D preview panel.",
 			_schema({ area = { "type": "string", "enum": [ "window", "graph", "preview_2d", "preview_3d" ], "default": "window" } }), ro),
 		_def("inspect_image", "Inspect image", "Look at an image file on disk (a reference photo, an exported texture...), whole or zoomed into a region at full resolution. Small regions are enlarged so fine detail (weave, grain, stitching, pores) is clearly visible. Returns the image and the file's pixel size.",
@@ -803,7 +803,7 @@ func _tool_render_material_preview(args : Dictionary) -> Dictionary:
 	if material == null or not material.has_method("set_3d_previews"):
 		return _fail("Project %d has no Material node to preview." % ctx.index)
 	var shape : String = str(args.get("shape", "sphere"))
-	var index : int = [ "sphere", "cylinder", "cube", "current" ].find(shape)
+	var index : int = [ "sphere", "cylinder", "cube" ].find(shape)
 	if index == -1:
 		return _fail("Unknown shape `%s`." % shape)
 	var size : int = clampi(int(args.get("size", 512)), 64, 2048)

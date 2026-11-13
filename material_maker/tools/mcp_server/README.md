@@ -56,7 +56,7 @@ references written from the manual (`references/concepts.md`,
 | `get_node` | Full detail of one node, including parameter definitions and current values |
 | `render_output` | Render a node output to PNG, or zoom into a full-resolution `region` (optionally saved as png/exr/jpg/webp) |
 | `inspect_image` | Look at an image file (e.g. a reference photo), whole or zoomed into a region |
-| `render_material_preview` | Render the material on a sphere, cube, cylinder or the current 3D preview object |
+| `render_material_preview` | Render a project's material on a sphere, cube or cylinder (independent of the shown tab) |
 | `capture_view` | Screenshot the window, graph editor, 2D or 3D preview panel |
 | `get_console` | Latest console lines (shader errors, export messages) |
 | `list_export_targets` | Export profiles of the material (Godot, Unity, Unreal, Blender, ...) |
