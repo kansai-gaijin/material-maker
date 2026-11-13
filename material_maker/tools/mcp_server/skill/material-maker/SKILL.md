@@ -210,7 +210,14 @@ how a weave is built. So study it before you build, and compare against it
 up close before you finish.
 
 1. **Look at the whole image** with `inspect_image {path}` for layout,
-   proportions, colours and how the light falls.
+   proportions, colours and how the light falls. Then decide **which
+   surfaces** it shows. A material describes one surface and must tile
+   seamlessly so it can go on any model. A photo often shows several (tatami
+   rush and its fabric border, bricks and a stone sill, planks and metal
+   trim): build each as its own seamless material, and leave the layout
+   (sizes, borders, where one meets the other) to the 3D model and its UVs.
+   Only bake a layout into one texture when the person explicitly asks for
+   a decal, trim sheet or single-plane texture; if unsure, ask.
 2. **Zoom into the fine detail** with `inspect_image {path, region}`. Take
    several small regions (5–15 % of the image) where the detail is sharpest
    and best lit, typically near the camera: a patch of the main surface, a
