@@ -34,6 +34,16 @@ an optional bearer token (clients then send `Authorization: Bearer <token>`)
 and has copy buttons for the commands above. From the command line,
 `--mcp-port=<port>` overrides the port and `--no-mcp` disables the server.
 
+## Agent skill
+
+`skill/material-maker/` is a Claude Code skill that teaches an agent how to
+build good materials with these tools: the Material node's channels and
+conventions (depth is inverted height, Material Maker's own normal format),
+the height-first workflow, how to find nodes and verify results, and two
+references written from the manual (`references/concepts.md`,
+`references/nodes.md`). Install it by copying the folder into
+`~/.claude/skills/`.
+
 ## Tools
 
 | Tool | What it does |

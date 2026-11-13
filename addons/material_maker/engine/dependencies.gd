@@ -198,9 +198,16 @@ func do_update():
 			if buffer.object != null and buffer.object is MMGenBase and buffer.status != Buffer.Updated:
 				invalidated_buffers += 1
 			if (buffer.status == Buffer.Invalidated or buffer.status == Buffer.UpdatingInvalidated) and buffer.pending_dependencies == 0:
+				# The owner may have been freed while an earlier buffer of this loop
+				# was rendering (fast undo/redo, e.g. from an MCP client). Touching it
+				# would abort this coroutine and leave `updating` stuck, which stops
+				# all rendering until restart.
+				if not is_instance_valid(buffer.object):
+					buffers.erase(b)
+					continue
 				if buffer.object.has_method("on_dep_update_buffer"):
 					buffer.status = Buffer.Updating
-					var status = await buffer.object.on_dep_update_buffer(b)
+					var status = await _update_buffer_guarded(buffer.object, b)
 					if status is bool and ! status:
 						buffer.status = Buffer.Error
 		if reset_stats:
@@ -211,6 +218,23 @@ func do_update():
 			emit_signal("render_queue_empty")
 	updating = false
 	updated.emit()
+
+# Awaiting on_dep_update_buffer() directly never returns if its object is freed
+# meanwhile (e.g. a project tab closed while it renders): `updating` would then
+# stay true and nothing would render again. Run the update in a helper and stop
+# waiting as soon as its owner is gone.
+func _update_buffer_guarded(object : Object, buffer_name : String):
+	var result : Array = [ false, null ]
+	_run_buffer_update(object, buffer_name, result)
+	while not result[0]:
+		if not is_instance_valid(object):
+			return false
+		await get_tree().process_frame
+	return result[1]
+
+func _run_buffer_update(object : Object, buffer_name : String, result : Array) -> void:
+	result[1] = await object.on_dep_update_buffer(buffer_name)
+	result[0] = true
 
 func get_render_queue_size() -> int:
 	var invalidated_buffers : int = 0

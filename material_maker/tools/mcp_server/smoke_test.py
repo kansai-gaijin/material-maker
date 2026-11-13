@@ -195,6 +195,36 @@ def main():
     data, _ = tool(c, "disconnect_nodes", {"project": project, "inputs": [{"node": "Material", "port": roughness}]})
     check("disconnected roughness", len(data.get("disconnected", [])) == 1, data)
 
+    print("rendering still works after rapid edits")
+    data, _ = tool(c, "add_nodes", {"project": project, "nodes": [{"id": "nm", "type": "normal_map2"}],
+                                    "connections": [{"from": bricks, "to": "nm"}, {"from": "nm", "to": "Material", "to_port": 4}]})
+    data, result = tool(c, "render_material_preview", {"project": project, "size": 128})
+    check("buffers finished rendering", "warning" not in data, data)
+    tool(c, "undo", {"project": project})
+    data, _ = tool(c, "describe_node_type", {"type": "normal_map2"})
+    algo = next((p for p in data.get("parameters", []) if p["name"] == "param2"), {})
+    check("linked group parameter resolved", algo.get("type") == "enum" and len(algo.get("values", [])) > 1, algo)
+    data, _ = tool(c, "describe_node_type", {"type": "switch"})
+    check("builtin switch describes its ports", len(data.get("inputs", [])) > 0, data)
+
+    print("previews of different projects stay separate")
+    shots = {}
+    others = []
+    for color in ("#ff2020", "#2040ff"):
+        data, _ = tool(c, "new_material")
+        other = data["project"]
+        others.append(other)
+        tool(c, "add_nodes", {"project": other, "nodes": [{"id": "flat", "type": "uniform", "parameters": {"color": color}}],
+                              "connections": [{"from": "flat", "to": "Material", "to_port": 0}]})
+        _, result = tool(c, "render_material_preview", {"project": other, "size": 96})
+        shots[color] = image_of(result)
+    check("red and blue projects render differently", shots["#ff2020"] != shots["#2040ff"])
+    for other in reversed(others):
+        tool(c, "close_project", {"project": other, "discard_changes": True})
+    tool(c, "set_parameters", {"project": project, "node": bricks, "parameters": {"rows": 7}})
+    data, _ = tool(c, "render_material_preview", {"project": project, "size": 128})
+    check("rendering still works after closing tabs mid-render", "warning" not in data, data)
+
     print("groups")
     data, _ = tool(c, "create_group", {"project": project, "nodes": [bricks, tint], "label": "Brick wall"})
     group = data.get("group_path", "")

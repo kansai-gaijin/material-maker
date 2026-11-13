@@ -389,9 +389,37 @@ func _parameter_values(generator : MMGenBase) -> Dictionary:
 			values[p.name] = MMType.serialize_value(generator.get_parameter(p.name))
 	return values
 
+## Group-based nodes (Normal Map, Occlusion, Slope Blur...) expose "linked"
+## parameters whose type, range and enum values belong to the inner node they
+## drive. Material Maker only resolves them for nodes inside the scene tree,
+## so resolve them here too (describe_node_type inspects detached nodes).
+func _resolved_parameter_defs(generator : MMGenBase) -> Array:
+	var defs : Array = []
+	var remote = generator.get_node_or_null("gen_parameters") if generator is MMGenGraph else null
+	for p in generator.get_parameter_defs():
+		var def : Dictionary = p
+		if str(p.get("type", "")) in [ "", "linked_control" ] and remote != null and remote.get("widgets") is Array:
+			for w in remote.widgets:
+				if w.get("name") != p.get("name") or w.get("type") != "linked_control" or w.get("linked_widgets", []).is_empty():
+					continue
+				var linked = w.linked_widgets[0]
+				var target = generator.get_node_or_null(NodePath(str(linked.node)))
+				if target is MMGenBase:
+					for pd in _resolved_parameter_defs(target):
+						if pd.get("name") == linked.widget:
+							def = pd.duplicate(true)
+							def.name = p.name
+							for k in [ "label", "shortdesc", "longdesc" ]:
+								if p.has(k) and str(p[k]) != "":
+									def[k] = p[k]
+							break
+				break
+		defs.append(def)
+	return defs
+
 func _parameter_definitions(generator : MMGenBase, with_values : bool) -> Array:
 	var defs : Array = []
-	for p in generator.get_parameter_defs():
+	for p in _resolved_parameter_defs(generator):
 		if not p.has("name"):
 			continue
 		var d : Dictionary = { name = p.name, type = p.get("type", "") }
@@ -402,7 +430,10 @@ func _parameter_definitions(generator : MMGenBase, with_values : bool) -> Array:
 			var values : Array = []
 			for i in p.values.size():
 				var v = p.values[i]
-				values.append({ index = i, label = v.get("name", ""), value = v.get("value", "") })
+				if v is Dictionary:
+					values.append({ index = i, label = v.get("name", ""), value = v.get("value", "") })
+				else:
+					values.append({ index = i, label = str(v), value = v })
 			d.values = values
 		elif p.get("type") == "size":
 			d.note = "Value v means a size of 2^(v) pixels (e.g. 10 = 1024)."
@@ -475,13 +506,15 @@ static func _convert_parameter(def : Dictionary, v) -> Dictionary:
 				if int(v) < 0 or int(v) >= values.size():
 					return { error = "index out of range 0..%d" % (values.size() - 1) }
 				return { value = int(v) }
-			if v is String:
-				for i in values.size():
-					if str(values[i].get("name", "")).to_lower() == v.to_lower() or str(values[i].get("value", "")).to_lower() == v.to_lower():
-						return { value = i }
 			var labels : PackedStringArray = []
 			for e in values:
-				labels.append(str(e.get("name", "")))
+				labels.append(str(e.get("name", "")) if e is Dictionary else str(e))
+			if v is String:
+				for i in values.size():
+					var e = values[i]
+					var e_value : String = str(e.get("value", "")) if e is Dictionary else str(e)
+					if labels[i].to_lower() == v.to_lower() or e_value.to_lower() == v.to_lower():
+						return { value = i }
 			return { error = "expects an index or one of: " + ", ".join(labels) }
 		"color":
 			var c = _parse_color(v)
@@ -611,11 +644,14 @@ func _tool_describe_node_type(args : Dictionary) -> Dictionary:
 	var generator : MMGenBase = await mm_loader.create_gen(data)
 	if generator == null:
 		return _fail("Material Maker could not create a `%s` node." % data.get("type", "?"))
+	# Nodes normally fill in their default parameters in _ready(); this one never
+	# enters the tree, and some (e.g. switch) need those values to list their ports.
+	generator.init_parameters()
 	var info : Dictionary = {
 		type = data.type,
 		label = generator.get_type_name(),
 		description = generator.get_description() if generator.get_description() != "" else _type_description(data.type),
-		parameters = _parameter_definitions(generator, args.has("library_item")),
+		parameters = _parameter_definitions(generator, true),
 		has_randomness = generator.has_randomness()
 	}
 	info.merge(_ports(generator, false))
@@ -721,7 +757,14 @@ func _tool_render_material_preview(args : Dictionary) -> Dictionary:
 	var materials : Dictionary[Node, Array] = { _preview_viewport: _preview_viewport.get_materials() }
 	await material.set_3d_previews(materials)
 	var pending : int = await _wait_for_renders()
+	# Re-apply in case buffers finished after the first assignment
+	await material.set_3d_previews(materials)
 	var texture : ImageTexture = await _preview_viewport.get_preview(index)
+	# set_3d_previews() registers the viewport with this material for good;
+	# unregister it, or every material ever previewed keeps writing its shader
+	# into this shared viewport and later previews show the wrong material.
+	if is_instance_valid(material):
+		material.external_previews.erase(_preview_viewport)
 	if texture == null:
 		return _fail("The preview could not be rendered.")
 	var info : Dictionary = { project = ctx.index, shape = shape, size = size }
@@ -1029,7 +1072,7 @@ func _tool_add_nodes(args : Dictionary) -> Dictionary:
 
 func _apply_parameters(graph_edit, generator : MMGenBase, parameters : Dictionary) -> Dictionary:
 	var defs : Dictionary = {}
-	for p in generator.get_parameter_defs():
+	for p in _resolved_parameter_defs(generator):
 		if p.has("name"):
 			defs[p.name] = p
 	var converted : Dictionary = {}
