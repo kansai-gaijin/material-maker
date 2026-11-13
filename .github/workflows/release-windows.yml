@@ -1,5 +1,5 @@
 # Publishes a Windows build of this fork as a GitHub release on every push to
-# master, which Agent Orange installs and updates from (Settings > Editors >
+# master or mcp-server, which Agent Orange installs and updates from (Settings > Editors >
 # Tools). Built the same way as "Build Material Maker", on Linux with Godot's
 # own export templates.
 
@@ -7,7 +7,7 @@ name: "Release for Windows"
 
 on:
   push:
-    branches: [master]
+    branches: [master, mcp-server]
   workflow_dispatch:
 
 permissions:
