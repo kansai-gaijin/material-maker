@@ -1,0 +1,59 @@
+# Publishes a Windows build of this fork as a GitHub release on every push to
+# master, which Agent Orange installs and updates from (Settings > Editors >
+# Tools). Built the same way as "Build Material Maker", on Linux with Godot's
+# own export templates.
+
+name: "Release for Windows"
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-windows
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2
+  GODOT_SUB: stable
+  GODOT_DOWNLOAD_DIR: https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable
+  EXPORT_NAME: material_maker
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Get Godot and its export templates
+        run: |
+          cp -f material_maker/theme/default_theme_icons.svg material_maker/theme/default_theme_icons_export.svg
+          wget -q ${GODOT_DOWNLOAD_DIR}/Godot_v${GODOT_VERSION}-${GODOT_SUB}_linux.x86_64.zip
+          unzip -q Godot_v${GODOT_VERSION}-${GODOT_SUB}_linux.x86_64.zip
+          wget -q ${GODOT_DOWNLOAD_DIR}/Godot_v${GODOT_VERSION}-${GODOT_SUB}_export_templates.tpz
+          unzip -q -a Godot_v${GODOT_VERSION}-${GODOT_SUB}_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_SUB}
+          mv ./templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_SUB}
+      - name: Export
+        run: |
+          mkdir -p build/material_maker
+          ./Godot_v${GODOT_VERSION}-${GODOT_SUB}_linux.x86_64 --headless --export-release "Windows" ./build/material_maker/${EXPORT_NAME}.exe
+          test -f build/material_maker/${EXPORT_NAME}.exe
+      - name: Add Material Maker's data
+        run: |
+          for folder in addons/material_maker/nodes material_maker/environments material_maker/examples material_maker/library material_maker/meshes material_maker/misc/export; do
+            cp -R "./$folder" build/material_maker
+          done
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v1.8-mcp.${GITHUB_RUN_NUMBER}"
+          zip_file="Material-Maker-${tag}-windows-x64.zip"
+          (cd build && zip -q -r "../${zip_file}" material_maker)
+          gh release create "$tag" "$zip_file" --target "$GITHUB_SHA" --title "Material Maker $tag" --notes "Windows build of ${GITHUB_SHA}."
