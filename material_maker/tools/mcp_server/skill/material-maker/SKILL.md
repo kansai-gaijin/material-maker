@@ -218,6 +218,11 @@ up close before you finish.
    still unclear. Write down what you actually see:
    - the repeating element (a strand, fibre, grain, tile, stitch) and its
      cross-section: rounded, flat, ridged? Where is it light and dark?
+   - **direction**: which way the elements run relative to the edges and
+     borders of the object (e.g. across or along a border), and which way
+     any fine structure runs *inside* each element (fibres along a strand,
+     grain along a plank). Getting a direction wrong is the most visible
+     mistake a close-up reveals; check it again in your own render.
    - how elements are arranged and bound: row length, offsets, binding
      threads or stitches, and their rhythm;
    - variation between elements: colour shifts strand to strand, thickness
@@ -236,8 +241,9 @@ up close before you finish.
 4. **Compare at matched zoom.** Render the albedo (and height) with
    `render_output {size: 2048, region}` over an area showing the same number
    of elements as your reference crop, then look at the two side by side.
-   List the differences explicitly (profile, spacing, contrast, colour
-   variance, binding detail, border motif) and fix the biggest one. Repeat
+   List the differences explicitly (direction, profile, spacing, segment
+   breaks, contrast, colour variance, binding detail, border motif) and fix
+   the biggest one. Repeat
    until the close-ups match, then check the whole texture again for
    scale and repetition.
 5. **Only claim what you have seen.** Before you describe the result, check
